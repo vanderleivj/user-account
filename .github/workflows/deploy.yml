@@ -3,7 +3,7 @@ name: 🚀 Deploy to Hostinger via FTP
 on:
   push:
     branches:
-      - main # branch que vai disparar o deploy
+      - main
 
 jobs:
   build-and-deploy:
@@ -24,7 +24,6 @@ jobs:
       - name: Build project
         run: npm run build
 
-      # Copia o .htaccess para a dist após o build
       - name: Copy .htaccess
         run: cp .htaccess dist/.htaccess || true
 
@@ -35,8 +34,10 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
+          protocol: ftp
           local-dir: dist/
           server-dir: /public_html/app/
+          log-level: verbose
           exclude: |
             **/.git*
             **/.github*
