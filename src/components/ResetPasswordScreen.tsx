@@ -208,7 +208,6 @@ export default function ResetPasswordScreen() {
       // Verificar se já existe uma sessão válida de recovery
       const {
         data: { session },
-        error: sessionError,
       } = await supabase.auth.getSession();
 
       // Se já temos sessão e código, ativar modo recovery
