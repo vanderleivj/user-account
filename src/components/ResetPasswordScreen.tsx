@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -19,58 +19,31 @@ export default function ResetPasswordScreen() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false });
 
-  useEffect(() => {
-    const checkHashParams = () => {
-      const hashParams = new URLSearchParams(
-        globalThis.location.hash.substring(1)
-      );
-      const typeFromHash = hashParams.get("type");
-      const accessToken = hashParams.get("access_token");
-
-      if (typeFromHash === "recovery" || accessToken) {
-        setIsPasswordResetMode(true);
-        verifyUserAuthentication();
-      } else {
-        setIsPasswordResetMode(false);
-      }
-    };
-
-    checkHashParams();
-
-    const handleHashChange = () => {
-      checkHashParams();
-    };
-
-    globalThis.addEventListener("hashchange", handleHashChange);
-
-    return () => {
-      globalThis.removeEventListener("hashchange", handleHashChange);
-    };
-  }, [search]);
-
-  const verifyUserAuthentication = async () => {
+  const verifyUserAuthentication = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Primeiro, tentar obter a sessão atual (pode ter sido estabelecida pelo Supabase automaticamente)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // Se já temos uma sessão válida, usar ela
+      if (session?.user) {
+        setMessage("Defina sua nova senha abaixo.");
+        setMessageType("success");
+        setIsLoading(false);
+        return;
+      }
+
+      // Se não temos sessão, tentar processar tokens do hash
       const hashParams = new URLSearchParams(
         globalThis.location.hash.substring(1)
       );
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
-      const type = hashParams.get("type");
 
-      if (type === "recovery" && accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        setMessage("Defina sua nova senha abaixo.");
-        setMessageType("success");
-      } else if (accessToken && refreshToken) {
+      // Se temos tokens no hash, estabelecer a sessão
+      if (accessToken && refreshToken) {
         const { error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
@@ -83,12 +56,13 @@ export default function ResetPasswordScreen() {
         setMessage("Defina sua nova senha abaixo.");
         setMessageType("success");
       } else {
+        // Tentar obter o usuário (pode estar autenticado mas sem sessão salva)
         const {
           data: { user },
-          error,
+          error: userError,
         } = await supabase.auth.getUser();
 
-        if (error || !user) {
+        if (userError || !user) {
           setMessage("Sessão expirada. Solicite um novo reset de senha.");
           setMessageType("error");
           setIsPasswordResetMode(false);
@@ -97,14 +71,254 @@ export default function ResetPasswordScreen() {
           setMessageType("success");
         }
       }
-    } catch (error) {
-      setMessage("Erro ao verificar sessão. Tente novamente.");
+    } catch (error: any) {
+      console.error("Erro ao verificar autenticação:", error);
+      setMessage(error.message || "Erro ao verificar sessão. Tente novamente.");
       setMessageType("error");
       setIsPasswordResetMode(false);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const checkParamsAndSession = async () => {
+      // Verificar hash params
+      const hashParams = new URLSearchParams(
+        globalThis.location.hash.substring(1)
+      );
+      const typeFromHash = hashParams.get("type");
+      const accessToken = hashParams.get("access_token");
+      const codeFromHash = hashParams.get("code"); // Código no hash
+
+      // Verificar query params
+      const queryParams = new URLSearchParams(globalThis.location.search);
+      const typeFromQuery = queryParams.get("type");
+      const codeFromQuery = queryParams.get("code"); // Código na query
+
+      // Priorizar código do hash, depois query
+      const code = codeFromHash || codeFromQuery;
+
+      // Se temos um código, precisamos processá-lo manualmente
+      if (code) {
+        console.log(
+          "🔑 Detectado código de recovery, processando manualmente...",
+          code.substring(0, 20) + "..."
+        );
+        setIsLoading(true);
+
+        // Se código está na query, converter para hash primeiro
+        if (codeFromQuery && !codeFromHash) {
+          console.log("🔄 Convertendo código de query para hash...");
+          const hashParam = "#code=" + codeFromQuery;
+          const newUrl =
+            globalThis.location.origin +
+            globalThis.location.pathname +
+            hashParam;
+          globalThis.location.replace(newUrl);
+          return; // Página vai recarregar com hash
+        }
+
+        // Se código está no hash, verificar erros primeiro
+        if (codeFromHash) {
+          // Verificar se há erros no hash (pode vir do redirect do Supabase)
+          const errorFromHash = hashParams.get("error");
+          const errorCode = hashParams.get("error_code");
+          const errorDescription = hashParams.get("error_description");
+
+          if (errorFromHash || errorCode) {
+            console.error("❌ Erro detectado:", errorCode, errorDescription);
+            setIsLoading(false);
+            setMessage(
+              errorCode === "otp_expired"
+                ? "Link de recuperação expirado. Solicite um novo reset de senha."
+                : errorDescription?.replaceAll("+", " ") ||
+                    "Link de recuperação inválido. Solicite um novo reset."
+            );
+            setMessageType("error");
+            setIsPasswordResetMode(false);
+            // Limpar hash com erro
+            globalThis.history.replaceState(
+              {},
+              "",
+              globalThis.location.pathname
+            );
+            return;
+          }
+
+          // Verificar se já temos sessão (pode ter sido estabelecida automaticamente)
+          const {
+            data: { session: checkSession },
+          } = await supabase.auth.getSession();
+
+          if (checkSession?.user) {
+            console.log("✅ Sessão já existe");
+            setIsPasswordResetMode(true);
+            setIsLoading(false);
+            setMessage("Defina sua nova senha abaixo.");
+            setMessageType("success");
+            globalThis.history.replaceState(
+              {},
+              "",
+              globalThis.location.pathname
+            );
+            return;
+          }
+
+          // Se não há sessão e não há erro, o código pode estar inválido ou expirado
+          // Aguardar um pouco mais para ver se o Supabase processa
+          console.log(
+            "⏳ Código presente mas sem sessão, aguardando processamento..."
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+
+          const {
+            data: { session: delayedSession },
+          } = await supabase.auth.getSession();
+
+          if (delayedSession?.user) {
+            console.log("✅ Sessão criada após delay");
+            setIsPasswordResetMode(true);
+            setIsLoading(false);
+            setMessage("Defina sua nova senha abaixo.");
+            setMessageType("success");
+            globalThis.history.replaceState(
+              {},
+              "",
+              globalThis.location.pathname
+            );
+            return;
+          }
+
+          // Se ainda não temos sessão, provavelmente o código está expirado/inválido
+          console.warn("⚠️ Código presente mas sem sessão após delay");
+          setIsLoading(false);
+          setMessage(
+            "Link de recuperação inválido ou expirado. Solicite um novo reset de senha."
+          );
+          setMessageType("error");
+          setIsPasswordResetMode(false);
+          globalThis.history.replaceState({}, "", globalThis.location.pathname);
+        }
+
+        console.warn("⚠️ Não foi possível processar o código automaticamente");
+        setIsLoading(false);
+      }
+
+      // Verificar se já existe uma sessão válida de recovery
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      // Se já temos sessão e código, ativar modo recovery
+      if (codeFromQuery && session) {
+        console.log("✅ Sessão já estabelecida com código de recovery");
+        setIsPasswordResetMode(true);
+        setIsLoading(false);
+        setMessage("Defina sua nova senha abaixo.");
+        setMessageType("success");
+        // Limpar código da URL
+        globalThis.history.replaceState({}, "", globalThis.location.pathname);
+        return;
+      }
+
+      // Detectar se estamos no modo de reset de senha
+      const isRecoveryMode =
+        typeFromHash === "recovery" ||
+        typeFromQuery === "recovery" ||
+        accessToken ||
+        (session?.user && session.user.app_metadata?.provider === "email");
+
+      if (isRecoveryMode) {
+        setIsPasswordResetMode(true);
+        verifyUserAuthentication();
+      } else {
+        setIsPasswordResetMode(false);
+      }
+    };
+
+    checkParamsAndSession();
+
+    // Escutar mudanças no hash
+    const handleHashChange = () => {
+      checkParamsAndSession();
+    };
+
+    globalThis.addEventListener("hashchange", handleHashChange);
+
+    // Escutar mudanças na sessão do Supabase
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("🔔 Auth state changed:", event, session?.user?.id);
+
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        if (session?.user) {
+          console.log("✅ Sessão de recovery estabelecida:", session.user.id);
+          setIsPasswordResetMode(true);
+          setIsLoading(false);
+          setMessage("Defina sua nova senha abaixo.");
+          setMessageType("success");
+
+          // Limpar código da URL após processamento
+          if (globalThis.location.search.includes("code=")) {
+            globalThis.history.replaceState(
+              {},
+              "",
+              globalThis.location.pathname
+            );
+          }
+
+          return;
+        }
+      }
+
+      // Para outros eventos, revalidar
+      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        if (session?.user) {
+          checkParamsAndSession();
+        }
+      }
+
+      // Se ainda temos código na URL após INITIAL_SESSION, verificar novamente após um delay
+      if (
+        event === "INITIAL_SESSION" &&
+        globalThis.location.search.includes("code=")
+      ) {
+        console.log(
+          "⏳ INITIAL_SESSION com código, aguardando processamento..."
+        );
+        setTimeout(async () => {
+          const {
+            data: { session: delayedSession },
+          } = await supabase.auth.getSession();
+          if (delayedSession?.user) {
+            console.log("✅ Sessão criada após delay");
+            setIsPasswordResetMode(true);
+            setIsLoading(false);
+            setMessage("Defina sua nova senha abaixo.");
+            setMessageType("success");
+            globalThis.history.replaceState(
+              {},
+              "",
+              globalThis.location.pathname
+            );
+          } else {
+            console.warn(
+              "⚠️ Sessão não foi criada após delay com código na URL"
+            );
+            setIsLoading(false);
+          }
+        }, 1000);
+      }
+    });
+
+    return () => {
+      globalThis.removeEventListener("hashchange", handleHashChange);
+      subscription.unsubscribe();
+    };
+  }, [search, verifyUserAuthentication]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

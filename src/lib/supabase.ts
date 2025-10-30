@@ -9,6 +9,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false, // Para web, não precisamos detectar sessão na URL
+    detectSessionInUrl: true, // Habilita detecção automática de sessão na URL (para recovery links)
+    // Não forçar PKCE para recovery - deixar o Supabase escolher o flow apropriado
   },
 });
