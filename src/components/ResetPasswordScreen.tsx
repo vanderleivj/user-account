@@ -5,6 +5,9 @@ import { supabase } from "../lib/supabase";
 import ScreenLayout from "./ScreenLayout";
 
 export default function ResetPasswordScreen() {
+  const APP_URL =
+    (import.meta as any).env?.VITE_PUBLIC_SITE_URL ||
+    globalThis.location.origin;
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -340,7 +343,7 @@ export default function ResetPasswordScreen() {
 
   const handlePasswordResetRequest = async () => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${globalThis.location.origin}/#type=recovery`,
+      redirectTo: `${APP_URL}/#type=recovery`,
     });
 
     if (error) {
