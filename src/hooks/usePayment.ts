@@ -23,7 +23,8 @@ export const usePayment = () => {
 
   const handlePaymentWithStripe = async (
     plan: PlanConfig,
-    couponCode?: string
+    couponCode?: string,
+    paymentMethod?: "boleto_card" | "pix"
   ) => {
     try {
       setLoading(true);
@@ -106,6 +107,7 @@ export const usePayment = () => {
         email: userProfile.email,
         fullName: fullName,
         couponCode: couponCode || null,
+        paymentMethod: paymentMethod || null,
         metadata: {
           user_id: user.id,
           full_name: fullName,
@@ -113,6 +115,7 @@ export const usePayment = () => {
           stripe_product_id: plan.stripeProductId,
           stripe_price_id: plan.stripePriceId,
           coupon_code: couponCode || null,
+          payment_method: paymentMethod || null,
         },
         successUrl: `${window.location.origin}/success`,
         cancelUrl: `${window.location.origin}/plans`,
@@ -154,9 +157,12 @@ export const usePayment = () => {
         };
       }
 
-      console.error("Edge Function não retornou checkoutUrl:", responseData);
+      console.error(
+        "Edge Function não retornou checkoutUrl ou dados PIX:",
+        responseData
+      );
       throw new Error(
-        "Não foi possível obter URL de checkout. Tente novamente."
+        "Não foi possível obter URL de checkout ou dados do PIX. Tente novamente."
       );
     } catch (error: any) {
       console.error("Erro no pagamento:", error);

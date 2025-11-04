@@ -26,6 +26,7 @@ serve(async (req) => {
       metadata,
       successUrl,
       cancelUrl,
+      paymentMethod,
     } = await req.json();
 
     if (!priceId || !email) {
@@ -56,6 +57,76 @@ serve(async (req) => {
       });
     }
 
+    if (paymentMethod === "pix") {
+      const price = await stripe.prices.retrieve(priceId);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: price.unit_amount || 0,
+        currency: price.currency || "brl",
+        customer: customer.id,
+        payment_method_types: ["pix"],
+        metadata: {
+          ...metadata,
+          plan_type: planType,
+          payment_method: "pix",
+          price_id: priceId,
+        },
+      });
+
+      const updatedPaymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntent.id
+      );
+
+      const pixData = updatedPaymentIntent.next_action?.display_pix_qr_code;
+
+      if (!pixData || !pixData.qr_code) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const retryPaymentIntent = await stripe.paymentIntents.retrieve(
+          paymentIntent.id
+        );
+        const retryPixData =
+          retryPaymentIntent.next_action?.display_pix_qr_code;
+
+        if (!retryPixData || !retryPixData.qr_code) {
+          throw new Error(
+            "Não foi possível gerar dados do PIX. Tente novamente."
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            paymentIntentId: retryPaymentIntent.id,
+            pixQrCode: retryPixData.qr_code,
+            pixCode: retryPixData.code || "",
+            pixKey: customer.email || email,
+            expiresAt: retryPixData.expires_at,
+            amount: price.unit_amount ? price.unit_amount / 100 : 0,
+            currency: price.currency || "brl",
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          paymentIntentId: updatedPaymentIntent.id,
+          pixQrCode: pixData.qr_code,
+          pixCode: pixData.code || "",
+          pixKey: customer.email || email,
+          expiresAt: pixData.expires_at,
+          amount: price.unit_amount ? price.unit_amount / 100 : 0,
+          currency: price.currency || "brl",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const sessionConfig: any = {
       customer: customer.id,
       payment_method_types: ["card", "boleto"],
@@ -71,11 +142,13 @@ serve(async (req) => {
       metadata: {
         ...metadata,
         plan_type: planType,
+        payment_method: paymentMethod || "boleto_card",
       },
       subscription_data: {
         metadata: {
           ...metadata,
           plan_type: planType,
+          payment_method: paymentMethod || "boleto_card",
         },
       },
       allow_promotion_codes: true,

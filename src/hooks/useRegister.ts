@@ -113,6 +113,8 @@ export function useRegister() {
   const [messageType, setMessageType] = useState<"success" | "error">("error");
   const [showInactiveScreen, setShowInactiveScreen] = useState(false);
   const [inactiveReason, setInactiveReason] = useState("");
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [existingUserEmail, setExistingUserEmail] = useState("");
 
   const {
     control,
@@ -305,6 +307,19 @@ export function useRegister() {
         );
       }
 
+      const { data: existingUserByEmail } = await supabase
+        .from("users")
+        .select("email")
+        .eq("email", data.email)
+        .maybeSingle();
+
+      if (existingUserByEmail) {
+        setExistingUserEmail(data.email);
+        setShowLoginModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.senha,
@@ -319,6 +334,16 @@ export function useRegister() {
       });
 
       if (authError) {
+        if (
+          authError.message.includes("already registered") ||
+          authError.message.includes("User already registered") ||
+          authError.message.includes("email address is already registered")
+        ) {
+          setExistingUserEmail(data.email);
+          setShowLoginModal(true);
+          setIsSubmitting(false);
+          return;
+        }
         console.error("❌ Erro no Supabase Auth:", authError);
         throw new Error(authError.message);
       }
@@ -472,5 +497,8 @@ export function useRegister() {
     showInactiveScreen,
     inactiveReason,
     handleBackToLogin,
+    showLoginModal,
+    setShowLoginModal,
+    existingUserEmail,
   };
 }
