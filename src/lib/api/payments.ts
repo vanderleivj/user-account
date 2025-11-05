@@ -8,7 +8,7 @@ export interface PixPaymentResponse {
 
 const API_BASE_URL =
   import.meta.env.VITE_ADMIN_API_URL ||
-  "https://admin-santo-encontro-vxdn.vercel.app";
+  "https://admin-santo-encontro.vercel.app";
 
 /**
  * Faz upload de comprovante PIX via API do admin
