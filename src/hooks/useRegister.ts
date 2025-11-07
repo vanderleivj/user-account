@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
 import { geocodeAddress, formatAddressForGeocoding } from "../lib/geocoding";
 
@@ -75,6 +76,7 @@ export const registerSchema = z
     zip_code: z.string().optional(),
     jaCasado: z.string().min(1, "Esta informação é obrigatória"),
     nulidadeMatrimonial: z.string().optional(),
+    isViuvo: z.string().optional(),
     viveCastidade: z.string().min(1, "Esta informação é obrigatória"),
     is_catholic: z.string().min(1, "Esta informação é obrigatória"),
     gender: z.string().min(1, "Sexo é obrigatório"),
@@ -89,6 +91,10 @@ export const registerSchema = z
   .refine(
     (data) => {
       if (data.jaCasado === "Sim") {
+        // Se for viúvo, não precisa de nulidade
+        if (data.isViuvo === "Sim") {
+          return true;
+        }
         return (
           data.nulidadeMatrimonial !== undefined &&
           data.nulidadeMatrimonial !== ""
@@ -109,8 +115,6 @@ export function useRegister() {
   const [isConfirmarSenhaVisible, setIsConfirmarSenhaVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingCep, setIsLoadingCep] = useState(false);
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"success" | "error">("error");
   const [showInactiveScreen, setShowInactiveScreen] = useState(false);
   const [inactiveReason, setInactiveReason] = useState("");
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -141,6 +145,7 @@ export function useRegister() {
       zip_code: "",
       jaCasado: "",
       nulidadeMatrimonial: "",
+      isViuvo: "",
       viveCastidade: "",
       is_catholic: "",
       gender: "",
@@ -149,6 +154,7 @@ export function useRegister() {
   });
 
   const jaCasado = watch("jaCasado");
+  const isViuvo = watch("isViuvo");
 
   const registerInactiveUser = async (
     data: RegisterFormData,
@@ -225,11 +231,13 @@ export function useRegister() {
         married_in_church: data.jaCasado === "Sim",
         marital_status:
           data.jaCasado === "Sim" ? data.nulidadeMatrimonial : null,
+        is_widowed: data.isViuvo === "Sim" || false,
         lives_chastity: data.viveCastidade === "Sim",
         is_catholic: data.is_catholic === "Sim" || false,
         gender: data.gender,
         age: parseInt(data.age),
         has_children: data.temFilhos === "Sim",
+        whatsapp: data.phone || null,
       };
 
       if (geocodingResult?.latitude && geocodingResult?.longitude) {
@@ -270,10 +278,13 @@ export function useRegister() {
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsSubmitting(true);
-    setMessage("");
 
     try {
-      if (data.jaCasado === "Sim" && data.nulidadeMatrimonial === "Não") {
+      if (
+        data.jaCasado === "Sim" &&
+        data.isViuvo !== "Sim" &&
+        data.nulidadeMatrimonial === "Não"
+      ) {
         await registerInactiveUser(data, "Nulidade matrimonial não possui");
         setIsSubmitting(false);
         return;
@@ -409,11 +420,13 @@ export function useRegister() {
         married_in_church: data.jaCasado === "Sim",
         marital_status:
           data.jaCasado === "Sim" ? data.nulidadeMatrimonial : null,
+        is_widowed: data.isViuvo === "Sim" || false,
         lives_chastity: data.viveCastidade === "Sim",
         is_catholic: data.is_catholic === "Sim" || false,
         gender: data.gender,
         age: parseInt(data.age),
         has_children: data.temFilhos === "Sim",
+        whatsapp: data.phone || null,
       };
 
       if (geocodingResult?.latitude && geocodingResult?.longitude) {
@@ -433,21 +446,22 @@ export function useRegister() {
         throw new Error("Erro ao criar perfil: " + profileError.message);
       }
 
-      setMessage(
-        "Cadastro realizado com sucesso! Redirecionando para escolha de planos..."
+      toast.success(
+        "Cadastro realizado com sucesso! Redirecionando para escolha de planos...",
+        {
+          duration: 2000,
+        }
       );
-      setMessageType("success");
 
       setTimeout(() => {
         window.location.href = "/plans";
       }, 2000);
     } catch (error: any) {
       console.error("❌ Erro no cadastro:", error);
-      setMessage(
+      toast.error(
         error?.message ||
           "Ocorreu um erro ao realizar seu cadastro. Por favor, tente novamente."
       );
-      setMessageType("error");
     } finally {
       setIsSubmitting(false);
     }
@@ -483,6 +497,7 @@ export function useRegister() {
     onSubmit,
     fetchAddressFromCEP,
     jaCasado,
+    isViuvo,
     errors,
     control,
     handleSubmit,
@@ -492,8 +507,6 @@ export function useRegister() {
     isSenhaVisible,
     isLoadingCep,
     isSubmitting,
-    message,
-    messageType,
     showInactiveScreen,
     inactiveReason,
     handleBackToLogin,

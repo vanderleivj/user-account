@@ -15,7 +15,7 @@ export const FormattedPhoneInput = ({
         htmlFor="phone"
         className="block text-sm font-medium text-gray-700"
       >
-        Telefone
+        WhatsApp
       </label>
       <input
         id="phone"

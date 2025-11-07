@@ -3,7 +3,6 @@ import { useRegister } from "../hooks/useRegister";
 import InactiveUserScreen from "./InactiveUserScreen";
 import ScreenLayout from "./ScreenLayout";
 import { RegisterHeader } from "./register/RegisterHeader";
-import { StatusMessage } from "./register/StatusMessage";
 import { PersonalDataSection } from "./register/PersonalDataSection";
 import { AddressSection } from "./register/AddressSection";
 import { ReligiousInfoSection } from "./register/ReligiousInfoSection";
@@ -16,6 +15,7 @@ export default function RegisterScreen() {
     onSubmit,
     fetchAddressFromCEP,
     jaCasado,
+    isViuvo,
     errors,
     control,
     handleSubmit,
@@ -25,8 +25,6 @@ export default function RegisterScreen() {
     isSenhaVisible,
     isLoadingCep,
     isSubmitting,
-    message,
-    messageType,
     showInactiveScreen,
     inactiveReason,
     showLoginModal,
@@ -50,8 +48,6 @@ export default function RegisterScreen() {
   return (
     <ScreenLayout>
       <RegisterHeader />
-
-      <StatusMessage message={message || ""} type={messageType} />
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -79,6 +75,7 @@ export default function RegisterScreen() {
           control={control}
           errors={errors}
           jaCasado={jaCasado}
+          isViuvo={isViuvo}
         />
 
         <TermsSection control={control} errors={errors} />

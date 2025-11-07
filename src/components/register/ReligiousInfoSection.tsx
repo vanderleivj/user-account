@@ -5,12 +5,14 @@ interface ReligiousInfoSectionProps {
   readonly control: Control<any>;
   readonly errors: FieldErrors<any>;
   readonly jaCasado: string;
+  readonly isViuvo: string | undefined;
 }
 
 export function ReligiousInfoSection({
   control,
   errors,
   jaCasado,
+  isViuvo,
 }: ReligiousInfoSectionProps) {
   return (
     <div className="bg-white/60 backdrop-blur-sm border border-slate-200/50 rounded-2xl p-6 shadow-sm">
@@ -39,26 +41,46 @@ export function ReligiousInfoSection({
           />
 
           {jaCasado === "Sim" && (
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700">
-                Se sim, tem o processo de nulidade matrimonial?{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                Nulidade matrimonial é quando um casamento é declarado inválido
-                pela Igreja Católica, mesmo tendo sido realizada a cerimônia
-                religiosa.
-              </p>
-              <RadioGroup
-                control={control}
-                name="nulidadeMatrimonial"
-                label=""
-                options={[
-                  { value: "Sim", label: "Sim" },
-                  { value: "Não", label: "Não" },
-                ]}
-                errors={errors}
-              />
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  É viúvo(a)?{" "}
+                </label>
+                <RadioGroup
+                  control={control}
+                  name="isViuvo"
+                  label=""
+                  options={[
+                    { value: "Sim", label: "Sim" },
+                    { value: "Não", label: "Não" },
+                  ]}
+                  errors={errors}
+                />
+              </div>
+
+              {isViuvo !== "Sim" && (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Se sim, tem o processo de nulidade matrimonial?{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-slate-500 text-sm leading-relaxed">
+                    Nulidade matrimonial é quando um casamento é declarado
+                    inválido pela Igreja Católica, mesmo tendo sido realizada a
+                    cerimônia religiosa.
+                  </p>
+                  <RadioGroup
+                    control={control}
+                    name="nulidadeMatrimonial"
+                    label=""
+                    options={[
+                      { value: "Sim", label: "Sim" },
+                      { value: "Não", label: "Não" },
+                    ]}
+                    errors={errors}
+                  />
+                </div>
+              )}
             </div>
           )}
 

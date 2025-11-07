@@ -11,6 +11,24 @@ const API_BASE_URL =
   "https://admin-santo-encontro.vercel.app";
 
 /**
+ * Mapeia o intervalo do plano para o tipo esperado pelo banco de dados
+ */
+function mapPlanIntervalToPlanType(interval: string | null): string {
+  if (!interval) return "monthly";
+
+  const intervalMap: Record<string, string> = {
+    month: "monthly",
+    year: "yearly",
+    quarterly: "quarterly",
+    semiannual: "semiannual",
+    monthly: "monthly",
+    yearly: "yearly",
+  };
+
+  return intervalMap[interval.toLowerCase()] || "monthly";
+}
+
+/**
  * Faz upload de comprovante PIX via API do admin
  */
 export async function uploadPixProof(
@@ -30,7 +48,9 @@ export async function uploadPixProof(
     formData.append("email", email);
   }
 
-  formData.append("planType", planType);
+  const mappedPlanType = mapPlanIntervalToPlanType(planType);
+
+  formData.append("planType", mappedPlanType);
   formData.append("amount", amount.toString());
 
   const response = await fetch(`${API_BASE_URL}/api/payments/pix/upload`, {
@@ -41,7 +61,24 @@ export async function uploadPixProof(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({
       error: "Erro ao enviar comprovante",
+      details: "",
     }));
+
+    if (errorData.details?.includes("plan_type_check")) {
+      throw new Error(
+        `Tipo de plano inválido: "${mappedPlanType}". O banco de dados espera: monthly, yearly, quarterly ou semiannual. Intervalo recebido: "${planType}"`
+      );
+    }
+
+    if (
+      errorData.details?.includes("mime type") &&
+      errorData.details?.includes("not supported")
+    ) {
+      throw new Error(
+        `Tipo de arquivo não suportado pelo servidor: ${errorData.details}. Por favor, verifique se o backend está configurado para aceitar este tipo de arquivo.`
+      );
+    }
+
     throw new Error(errorData.error || "Erro ao enviar comprovante");
   }
 
