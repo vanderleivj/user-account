@@ -30,10 +30,18 @@ export default function RegisterScreen() {
     showLoginModal,
     setShowLoginModal,
     existingUserEmail,
+    setInactiveReason,
+    setShowInactiveScreen,
   } = useRegister();
 
   const handleLoginSuccess = () => {
     navigate({ to: "/plans" });
+  };
+
+  const handleInactiveUser = (reason: string) => {
+    setInactiveReason(reason);
+    setShowInactiveScreen(true);
+    setShowLoginModal(false);
   };
 
   if (showInactiveScreen) {
@@ -47,7 +55,7 @@ export default function RegisterScreen() {
 
   return (
     <ScreenLayout>
-      <RegisterHeader />
+      <RegisterHeader onOpenLogin={() => setShowLoginModal(true)} />
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -101,6 +109,8 @@ export default function RegisterScreen() {
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={handleLoginSuccess}
         userEmail={existingUserEmail}
+        isManualTrigger={!existingUserEmail}
+        onInactiveUser={handleInactiveUser}
       />
     </ScreenLayout>
   );

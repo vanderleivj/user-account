@@ -493,6 +493,24 @@ export function useRegister() {
     setInactiveReason("");
   };
 
+  const checkInactiveUser = async (email: string) => {
+    try {
+      const { data: inactiveUser, error: inactiveUserError } = await supabase
+        .from("inactive_users")
+        .select("email, reason")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (inactiveUser && !inactiveUserError) {
+        return inactiveUser.reason;
+      }
+      return null;
+    } catch (error) {
+      console.error("Erro ao verificar usuário inativo:", error);
+      return null;
+    }
+  };
+
   return {
     onSubmit,
     fetchAddressFromCEP,
@@ -513,5 +531,8 @@ export function useRegister() {
     showLoginModal,
     setShowLoginModal,
     existingUserEmail,
+    checkInactiveUser,
+    setInactiveReason,
+    setShowInactiveScreen,
   };
 }

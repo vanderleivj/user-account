@@ -15,6 +15,8 @@ interface LoginModalProps {
   readonly onClose: () => void;
   readonly onLoginSuccess: () => void;
   readonly userEmail?: string;
+  readonly isManualTrigger?: boolean;
+  readonly onInactiveUser?: (reason: string) => void;
 }
 
 export function LoginModal({
@@ -22,6 +24,8 @@ export function LoginModal({
   onClose,
   onLoginSuccess,
   userEmail,
+  isManualTrigger = false,
+  onInactiveUser,
 }: LoginModalProps) {
   const [email, setEmail] = useState(userEmail || "");
   const [password, setPassword] = useState("");
@@ -32,8 +36,12 @@ export function LoginModal({
   useEffect(() => {
     if (userEmail) {
       setEmail(userEmail);
+    } else if (isManualTrigger && isOpen) {
+      setEmail("");
+      setPassword("");
+      setError("");
     }
-  }, [userEmail]);
+  }, [userEmail, isManualTrigger, isOpen]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +61,28 @@ export function LoginModal({
       }
 
       if (data.user) {
+        // Verificar se o usuário está na blacklist
+        const { data: inactiveUser, error: inactiveUserError } = await supabase
+          .from("inactive_users")
+          .select("email, reason")
+          .eq("email", email)
+          .maybeSingle();
+
+        if (inactiveUser && !inactiveUserError && inactiveUser.reason) {
+          // Usuário está na blacklist
+          if (onInactiveUser) {
+            onInactiveUser(inactiveUser.reason);
+          } else {
+            setError(
+              "Sua conta está inativa. Entre em contato conosco para mais informações."
+            );
+          }
+          // Fazer logout para não manter a sessão ativa
+          await supabase.auth.signOut();
+          return;
+        }
+
+        // Usuário não está na blacklist, prosseguir com login
         onLoginSuccess();
       }
     } catch (err: any) {
@@ -72,12 +102,13 @@ export function LoginModal({
               <span className="text-xl">🔐</span>
             </div>
             <DialogTitle className="text-2xl font-bold text-slate-900">
-              Usuário já cadastrado
+              {isManualTrigger ? "Fazer Login" : "Usuário já cadastrado"}
             </DialogTitle>
           </div>
           <DialogDescription className="text-slate-600 text-sm leading-relaxed">
-            Identificamos que este email já está cadastrado. Se você já possui
-            uma conta, faça login para continuar.
+            {isManualTrigger
+              ? "Digite suas credenciais para acessar sua conta e continuar."
+              : "Identificamos que este email já está cadastrado. Se você já possui uma conta, faça login para continuar."}
           </DialogDescription>
         </DialogHeader>
 
