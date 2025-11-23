@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import logo from "../assets/logo.png";
 import { usePlans, type PlanConfig } from "../hooks/usePlans";
+import { useBlackFriday } from "../hooks/useBlackFriday";
 import { usePayment } from "../hooks/usePayment";
 import { uploadPixProof } from "../lib/api/payments";
 import { supabase } from "../lib/supabase";
@@ -43,6 +44,8 @@ export default function PlansScreen() {
     error: plansError,
     refetch,
   } = usePlans();
+  const { config: blackFridayConfig } = useBlackFriday();
+
   const { handlePaymentWithStripe, loading: paymentLoading } = usePayment();
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("error");
@@ -264,19 +267,82 @@ export default function PlansScreen() {
   const renderPlanCard = (plan: PlanConfig) => {
     const isPopular = plan.isPopular;
     const isFree = plan.isFree;
+    const isBlackFriday = blackFridayConfig.enabled;
 
-    const cardClassName = isPopular
-      ? "bg-slate-900 text-white border-2 border-blue-500 ring-4 ring-blue-100 shadow-2xl scale-105"
-      : "bg-white border border-slate-200 shadow-lg hover:shadow-xl";
+    const getCardStyle = () => {
+      if (isBlackFriday) {
+        const style: React.CSSProperties = {
+          background: `linear-gradient(to bottom right, ${
+            blackFridayConfig.card_background_start || "#000000"
+          }, ${blackFridayConfig.card_background_mid || "#111827"}, ${
+            blackFridayConfig.card_background_end || "#000000"
+          })`,
+          color: blackFridayConfig.card_text_color || "#FFFFFF",
+          borderColor: isPopular
+            ? blackFridayConfig.badge_popular_background ||
+              blackFridayConfig.card_border_color ||
+              "#3B82F6"
+            : blackFridayConfig.card_border_color || "#DC2626",
+          borderWidth: "2px",
+          transform: isPopular ? "scale(1.05)" : "scale(1)",
+        };
 
-    const getButtonClassName = () => {
-      if (isPopular) {
-        return "bg-white text-slate-900 hover:bg-slate-100";
+        const shadow =
+          blackFridayConfig.shadow_color || "rgba(127, 29, 29, 0.5)";
+        style.boxShadow = `0 25px 50px -12px ${shadow}`;
+
+        if (isPopular && blackFridayConfig.ring_color) {
+          style.boxShadow = `${style.boxShadow}, 0 0 0 4px ${blackFridayConfig.ring_color}`;
+        }
+
+        if (blackFridayConfig.glow_color) {
+          style.filter = `drop-shadow(0 0 8px ${blackFridayConfig.glow_color})`;
+        }
+
+        return style;
+      } else if (isPopular) {
+        const borderColor =
+          blackFridayConfig.badge_popular_background || "#3B82F6";
+        const ringColor =
+          blackFridayConfig.ring_color || "rgba(59, 130, 246, 0.3)";
+
+        const style: React.CSSProperties = {
+          borderColor: borderColor,
+          borderWidth: "2px",
+          borderStyle: "solid",
+        };
+
+        style.boxShadow = `0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 4px ${ringColor}`;
+
+        return style;
       }
-      if (isFree) {
-        return "bg-blue-600 text-white hover:bg-blue-700";
+      return {};
+    };
+
+    const getButtonStyle = () => {
+      const style: React.CSSProperties = {};
+
+      if (blackFridayConfig.button_primary_background) {
+        style.backgroundColor = blackFridayConfig.button_primary_background;
       }
-      return "bg-slate-900 text-white hover:bg-slate-800";
+      if (blackFridayConfig.button_primary_text) {
+        style.color = blackFridayConfig.button_primary_text;
+      }
+      if (isBlackFriday && blackFridayConfig.button_primary_shadow) {
+        style.boxShadow = `0 10px 15px -3px ${blackFridayConfig.button_primary_shadow}`;
+      }
+
+      return style;
+    };
+
+    const getButtonHoverStyle = () => {
+      const style: React.CSSProperties = {};
+
+      if (blackFridayConfig.button_primary_hover) {
+        style.backgroundColor = blackFridayConfig.button_primary_hover;
+      }
+
+      return style;
     };
 
     const getButtonText = () => {
@@ -285,57 +351,188 @@ export default function PlansScreen() {
       return "Assinar Plano";
     };
 
+    const cardStyle = getCardStyle();
+
+    let baseCardClasses =
+      "rounded-2xl p-8 relative transition-all duration-300 flex flex-col h-full";
+
+    if (isBlackFriday) {
+      baseCardClasses += " border-2";
+    } else if (isPopular) {
+      baseCardClasses += " bg-slate-900 text-white shadow-2xl scale-105";
+    } else {
+      baseCardClasses +=
+        " bg-white border border-slate-200 shadow-lg hover:shadow-xl";
+    }
+
     return (
       <div
         key={plan.id}
-        className={`rounded-2xl p-8 relative transition-all duration-300 flex flex-col h-full ${cardClassName}`}
+        className={baseCardClasses}
+        style={cardStyle}
+        onMouseEnter={(e) => {
+          if (isBlackFriday && !isPopular) {
+            e.currentTarget.style.borderColor =
+              blackFridayConfig.card_border_hover ||
+              blackFridayConfig.card_border_color ||
+              "#DC2626";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (isBlackFriday && !isPopular) {
+            e.currentTarget.style.borderColor =
+              blackFridayConfig.card_border_color || "#DC2626";
+          }
+        }}
       >
         {isPopular && (
-          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-            <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
-              MAIS VENDIDO
+          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+            <div
+              className="px-4 py-2 rounded-full text-sm font-bold"
+              style={{
+                backgroundColor:
+                  blackFridayConfig.badge_popular_background || "#3B82F6",
+                color: blackFridayConfig.badge_popular_text || "#FFFFFF",
+                ...(isBlackFriday && {
+                  animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                  boxShadow: blackFridayConfig.badge_discount_shadow
+                    ? `0 10px 15px -3px ${blackFridayConfig.badge_discount_shadow}`
+                    : "0 10px 15px -3px rgba(220, 38, 38, 0.5)",
+                }),
+              }}
+            >
+              {isBlackFriday
+                ? blackFridayConfig.banner_text || "BLACK FRIDAY"
+                : "MAIS VENDIDO"}
             </div>
           </div>
         )}
 
         <div className="text-center mb-8">
           <h3
-            className={`text-2xl font-bold mb-3 ${
-              isPopular ? "text-white" : "text-slate-900"
-            }`}
+            className="text-2xl font-bold mb-3"
+            style={{
+              color: blackFridayConfig.card_text_color
+                ? blackFridayConfig.card_text_color
+                : isPopular
+                ? "#FFFFFF"
+                : "#0F172A",
+            }}
           >
             {plan.name}
           </h3>
           <p
-            className={`text-lg ${
-              isPopular ? "text-slate-300" : "text-slate-600"
-            }`}
+            className="text-lg"
+            style={{
+              color: blackFridayConfig.card_text_secondary
+                ? blackFridayConfig.card_text_secondary
+                : isPopular
+                ? "#CBD5E1"
+                : "#475569",
+            }}
           >
             {plan.description}
           </p>
         </div>
 
         <div className="text-center mb-8">
-          <div className="flex items-end justify-center mb-2">
-            <span
-              className={`text-4xl font-bold ${
-                isPopular ? "text-white" : "text-slate-900"
-              }`}
-            >
-              R$
-            </span>
-            <span
-              className={`text-6xl font-bold ml-2 ${
-                isPopular ? "text-white" : "text-slate-900"
-              }`}
-            >
-              {plan.price.toFixed(2).replace(".", ",")}
-            </span>
-          </div>
+          {plan.originalPrice && plan.originalPrice > plan.price ? (
+            <div className="mb-2">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <span
+                  className="text-lg line-through"
+                  style={{
+                    color: blackFridayConfig.price_original_color || "#9CA3AF",
+                  }}
+                >
+                  R$ {plan.originalPrice.toFixed(2).replace(".", ",")}
+                </span>
+                <span
+                  className="text-sm font-bold px-3 py-1 rounded-full animate-pulse"
+                  style={{
+                    backgroundColor:
+                      blackFridayConfig.discount_badge_color ||
+                      (isPopular ? "rgba(34, 197, 94, 0.2)" : "#D1FAE5"),
+                    color:
+                      blackFridayConfig.badge_discount_text ||
+                      (isPopular ? "#BBF7D0" : "#065F46"),
+                    ...(isBlackFriday &&
+                      blackFridayConfig.badge_discount_shadow && {
+                        boxShadow: `0 10px 15px -3px ${blackFridayConfig.badge_discount_shadow}`,
+                      }),
+                  }}
+                >
+                  {Math.round(
+                    ((plan.originalPrice - plan.price) / plan.originalPrice) *
+                      100
+                  )}
+                  % OFF
+                </span>
+              </div>
+              <div className="flex items-end justify-center">
+                <span
+                  className="text-4xl font-bold"
+                  style={{
+                    color: blackFridayConfig.price_currency_color
+                      ? blackFridayConfig.price_currency_color
+                      : isPopular
+                      ? "#FFFFFF"
+                      : "#0F172A",
+                  }}
+                >
+                  R$
+                </span>
+                <span
+                  className="text-6xl font-bold ml-2"
+                  style={{
+                    color: blackFridayConfig.price_discount_color
+                      ? blackFridayConfig.price_discount_color
+                      : isPopular
+                      ? "#FFFFFF"
+                      : "#0F172A",
+                  }}
+                >
+                  {plan.price.toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-end justify-center mb-2">
+              <span
+                className="text-4xl font-bold"
+                style={{
+                  color: blackFridayConfig.price_currency_color
+                    ? blackFridayConfig.price_currency_color
+                    : isPopular
+                    ? "#FFFFFF"
+                    : "#0F172A",
+                }}
+              >
+                R$
+              </span>
+              <span
+                className="text-6xl font-bold ml-2"
+                style={{
+                  color: blackFridayConfig.price_discount_color
+                    ? blackFridayConfig.price_discount_color
+                    : isPopular
+                    ? "#FFFFFF"
+                    : "#0F172A",
+                }}
+              >
+                {plan.price.toFixed(2).replace(".", ",")}
+              </span>
+            </div>
+          )}
           <p
-            className={`text-lg ${
-              isPopular ? "text-slate-300" : "text-slate-600"
-            }`}
+            className="text-lg"
+            style={{
+              color: blackFridayConfig.card_text_secondary
+                ? blackFridayConfig.card_text_secondary
+                : isPopular
+                ? "#CBD5E1"
+                : "#475569",
+            }}
           >
             por mês
           </p>
@@ -344,13 +541,24 @@ export default function PlansScreen() {
         <div className="space-y-4 mb-8 flex-grow">
           {plan.features.map((feature: string) => (
             <div key={feature} className="flex items-center gap-3">
-              <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{
+                  backgroundColor:
+                    blackFridayConfig.checkmark_color || "#22C55E",
+                }}
+              >
                 <Check size={12} className="text-white" />
               </div>
               <span
-                className={`text-base ${
-                  isPopular ? "text-slate-200" : "text-slate-700"
-                }`}
+                className="text-base"
+                style={{
+                  color: blackFridayConfig.card_text_secondary
+                    ? blackFridayConfig.card_text_secondary
+                    : isPopular
+                    ? "#E2E8F0"
+                    : "#334155",
+                }}
               >
                 {feature}
               </span>
@@ -362,7 +570,26 @@ export default function PlansScreen() {
           <button
             onClick={() => handlePaymentClick(plan)}
             disabled={paymentLoading}
-            className={`w-full py-4 px-6 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${getButtonClassName()}`}
+            className="w-full py-4 px-6 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            style={getButtonStyle()}
+            onMouseEnter={(e) => {
+              if (!paymentLoading) {
+                const hoverStyle = getButtonHoverStyle();
+                if (hoverStyle.backgroundColor) {
+                  e.currentTarget.style.backgroundColor =
+                    hoverStyle.backgroundColor;
+                }
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!paymentLoading) {
+                const buttonStyle = getButtonStyle();
+                if (buttonStyle.backgroundColor) {
+                  e.currentTarget.style.backgroundColor =
+                    buttonStyle.backgroundColor;
+                }
+              }
+            }}
           >
             {paymentLoading ? (
               <div className="flex items-center justify-center gap-2">
@@ -409,12 +636,93 @@ export default function PlansScreen() {
   }
 
   return (
-    <ScreenLayout>
+    <ScreenLayout blackFridayMode={blackFridayConfig.enabled}>
+      {/* Banner Black Friday */}
+      {blackFridayConfig.enabled && (
+        <div className="relative mb-8 overflow-hidden">
+          <div
+            className="py-4 px-6 rounded-2xl shadow-2xl border-2"
+            style={{
+              background: `linear-gradient(to right, ${
+                blackFridayConfig.banner_background_start || "#000000"
+              }, ${blackFridayConfig.banner_background_mid || "#7F1D1D"}, ${
+                blackFridayConfig.banner_background_end || "#000000"
+              })`,
+              borderColor: blackFridayConfig.banner_border_color || "#DC2626",
+              color: blackFridayConfig.banner_text_color || "#FFFFFF",
+            }}
+          >
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl animate-pulse">🔥</span>
+                <h2 className="text-2xl lg:text-3xl font-black tracking-wider">
+                  {blackFridayConfig.banner_text || "BLACK FRIDAY"}
+                </h2>
+                <span className="text-2xl animate-pulse">🔥</span>
+              </div>
+              <div
+                className="hidden md:block w-px h-8"
+                style={{
+                  backgroundColor:
+                    blackFridayConfig.banner_border_color || "#DC2626",
+                }}
+              ></div>
+              <p
+                className="text-lg font-bold animate-pulse"
+                style={{
+                  color:
+                    blackFridayConfig.banner_accent_text_color || "#FDE047",
+                }}
+              >
+                DESCONTOS ESPECIAIS!
+              </p>
+            </div>
+          </div>
+          {/* Efeito de brilho animado */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer pointer-events-none"></div>
+        </div>
+      )}
+
       <div className="text-center mb-12">
         <div className="flex justify-center mb-8">
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-100 to-gray-100 rounded-2xl blur-xl opacity-60"></div>
-            <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/50">
+            <div
+              className="absolute inset-0 rounded-2xl blur-xl opacity-60"
+              style={
+                blackFridayConfig.enabled
+                  ? {
+                      background: `linear-gradient(to right, ${
+                        blackFridayConfig.layout_background_start || "#000000"
+                      }, ${
+                        blackFridayConfig.layout_background_mid || "#111827"
+                      }, ${
+                        blackFridayConfig.layout_background_end || "#000000"
+                      })`,
+                    }
+                  : {
+                      background:
+                        "linear-gradient(to right, rgb(241 245 249), rgb(243 244 246))",
+                    }
+              }
+            ></div>
+            <div
+              className="relative backdrop-blur-sm rounded-2xl p-6 shadow-xl border"
+              style={
+                blackFridayConfig.enabled
+                  ? {
+                      backgroundColor:
+                        blackFridayConfig.layout_card_background ||
+                        "rgba(0, 0, 0, 0.9)",
+                      borderColor:
+                        blackFridayConfig.layout_card_border ||
+                        "rgba(220, 38, 38, 0.5)",
+                    }
+                  : {
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      borderColor: "rgba(255, 255, 255, 0.5)",
+                    }
+              }
+            >
               <img
                 src={logo}
                 alt="Santo Encontro"
@@ -424,10 +732,24 @@ export default function PlansScreen() {
           </div>
         </div>
 
-        <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-4">
+        <h1
+          className="text-4xl lg:text-5xl font-bold tracking-tight mb-4"
+          style={{
+            color: blackFridayConfig.enabled
+              ? blackFridayConfig.layout_text_primary || "#FFFFFF"
+              : "#0F172A",
+          }}
+        >
           Santo Encontro
         </h1>
-        <p className="text-slate-600 text-lg lg:text-xl font-light max-w-2xl mx-auto leading-relaxed mb-8">
+        <p
+          className="text-lg lg:text-xl font-light max-w-2xl mx-auto leading-relaxed mb-8"
+          style={{
+            color: blackFridayConfig.enabled
+              ? blackFridayConfig.layout_text_secondary || "#D1D5DB"
+              : "#475569",
+          }}
+        >
           Gerencie, acompanhe e otimize sua jornada espiritual com um plano
           feito para suas necessidades.
         </p>

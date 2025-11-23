@@ -21,10 +21,11 @@ export interface Plan {
 
 export interface PlanConfig {
   id: string;
-  originalId?: string; // UUID original do banco de dados
+  originalId?: string;
   name: string;
   description: string;
   price: number;
+  originalPrice?: number;
   currency: string;
   interval: string | null;
   interval_count: number | null;

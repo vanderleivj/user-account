@@ -6,23 +6,17 @@ export default function NotFoundScreen() {
   const location = useLocation();
 
   useEffect(() => {
-    console.log("🚫 Rota não encontrada:", location.pathname);
-
-    // Verificar se é uma rota de reset de senha com parâmetros
     if (location.pathname === "/" && location.search) {
       const urlParams = new URLSearchParams(location.search);
       const token = urlParams.get("token");
       const type = urlParams.get("type");
 
       if (token && type === "recovery") {
-        console.log("🔄 Redirecionando para reset-password-confirm");
         navigate({ to: "/" });
         return;
       }
     }
 
-    // Para outras rotas não encontradas, redirecionar para home
-    console.log("🏠 Redirecionando para home");
     navigate({ to: "/" });
   }, [navigate, location]);
 

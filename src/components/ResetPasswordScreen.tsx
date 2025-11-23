@@ -104,15 +104,10 @@ export default function ResetPasswordScreen() {
 
       // Se temos um código, precisamos processá-lo manualmente
       if (code) {
-        console.log(
-          "🔑 Detectado código de recovery, processando manualmente...",
-          code.substring(0, 20) + "..."
-        );
         setIsLoading(true);
 
         // Se código está na query, converter para hash primeiro
         if (codeFromQuery && !codeFromHash) {
-          console.log("🔄 Convertendo código de query para hash...");
           const hashParam = "#code=" + codeFromQuery;
           const newUrl =
             globalThis.location.origin +
@@ -155,7 +150,6 @@ export default function ResetPasswordScreen() {
           } = await supabase.auth.getSession();
 
           if (checkSession?.user) {
-            console.log("✅ Sessão já existe");
             setIsPasswordResetMode(true);
             setIsLoading(false);
             setMessage("Defina sua nova senha abaixo.");
@@ -168,11 +162,6 @@ export default function ResetPasswordScreen() {
             return;
           }
 
-          // Se não há sessão e não há erro, o código pode estar inválido ou expirado
-          // Aguardar um pouco mais para ver se o Supabase processa
-          console.log(
-            "⏳ Código presente mas sem sessão, aguardando processamento..."
-          );
           await new Promise((resolve) => setTimeout(resolve, 1500));
 
           const {
@@ -180,7 +169,6 @@ export default function ResetPasswordScreen() {
           } = await supabase.auth.getSession();
 
           if (delayedSession?.user) {
-            console.log("✅ Sessão criada após delay");
             setIsPasswordResetMode(true);
             setIsLoading(false);
             setMessage("Defina sua nova senha abaixo.");
@@ -215,7 +203,6 @@ export default function ResetPasswordScreen() {
 
       // Se já temos sessão e código, ativar modo recovery
       if (codeFromQuery && session) {
-        console.log("✅ Sessão já estabelecida com código de recovery");
         setIsPasswordResetMode(true);
         setIsLoading(false);
         setMessage("Defina sua nova senha abaixo.");
@@ -253,11 +240,8 @@ export default function ResetPasswordScreen() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔔 Auth state changed:", event, session?.user?.id);
-
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         if (session?.user) {
-          console.log("✅ Sessão de recovery estabelecida:", session.user.id);
           setIsPasswordResetMode(true);
           setIsLoading(false);
           setMessage("Defina sua nova senha abaixo.");
@@ -288,15 +272,11 @@ export default function ResetPasswordScreen() {
         event === "INITIAL_SESSION" &&
         globalThis.location.search.includes("code=")
       ) {
-        console.log(
-          "⏳ INITIAL_SESSION com código, aguardando processamento..."
-        );
         setTimeout(async () => {
           const {
             data: { session: delayedSession },
           } = await supabase.auth.getSession();
           if (delayedSession?.user) {
-            console.log("✅ Sessão criada após delay");
             setIsPasswordResetMode(true);
             setIsLoading(false);
             setMessage("Defina sua nova senha abaixo.");
