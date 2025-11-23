@@ -8,6 +8,7 @@ interface Plan {
   name: string;
   description: string | null;
   price: number;
+  original_price?: number | null; // Preço original antes do desconto
   currency: string;
   interval:
     | "day"
@@ -28,6 +29,7 @@ export interface PlanConfig {
   name: string;
   description: string;
   price: number;
+  originalPrice?: number; // Preço original antes do desconto
   currency: string;
   interval: string | null;
   interval_count: number | null;
@@ -65,6 +67,10 @@ export const usePlans = () => {
           name: plan.name,
           description: plan.description || "",
           price: plan.price,
+          originalPrice:
+            plan.original_price && plan.original_price > plan.price
+              ? plan.original_price
+              : undefined,
           currency: plan.currency,
           interval: plan.interval === "one_time" ? null : plan.interval,
           interval_count: plan.interval === "one_time" ? null : 1,
